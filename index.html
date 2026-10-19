@@ -34,6 +34,7 @@ input.search{width:100%;padding:14px 16px;border-radius:12px;border:1px solid #2
 .spin{position:absolute;inset:0;display:grid;place-items:center;background:#000a;text-align:center;font-size:14px;padding:16px}
 footer{padding:24px 16px;font-size:11px;color:var(--s);text-align:center;line-height:1.5}
 </style></head><body><div id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const G=[['Action',28],['Comedy',35],['Drama',18],['Horror',27],['Romance',10749],['Science Fiction',878]];
 const IMG='https://image.tmdb.org/t/p/';
@@ -41,9 +42,9 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 async function api(path,params={}){const r=await fetch('/api/tmdb?'+new URLSearchParams({path,...params}));const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Request failed ('+r.status+')');return j}
 const norm=(x,t)=>{t=x.media_type||t;return{key:t+':'+x.id,type:t,id:x.id,title:x.title||x.name||'Untitled',poster:x.poster_path,backdrop:x.backdrop_path,year:(x.release_date||x.first_air_date||'').slice(0,4),rating:x.vote_count>0?x.vote_average:null,overview:x.overview||''}};
 const TEST={key:'test',type:'test',id:0,title:'IndraPlay Test Reel',poster:null,backdrop:null,year:'2026',rating:null,overview:'An original 8-second clip generated in your browser to confirm the player works.'};
-let S={tab:'home',view:null,q:'',favs:[],prev:null},T,home={rows:{}};
-try{S.favs=JSON.parse(localStorage.getItem('ip_favs')||'[]')}catch(e){}
-const save=()=>{try{localStorage.setItem('ip_favs',JSON.stringify(S.favs))}catch(e){}};
+const SB_URL='https://qfcfdrzlcdgdrqspxyro.supabase.co',SB_KEY='sb_publishable_MXB4LH8VSaypO3dbZ-dACg_hqaLE-Og';
+let sb=null;try{sb=window.supabase.createClient(SB_URL,SB_KEY)}catch(e){}
+let S={tab:'home',view:null,q:'',favs:[],hist:[],user:null,plan:'free',authMode:'login',authMsg:'',recovery:false,prev:null},T,home={rows:{}};
 const $=document.getElementById('app'),reg={};
 const logo=`<span class="logo"><svg width="30" height="30" viewBox="0 0 32 32"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#A855F7"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#g)"/><path d="M12 9l12 7-12 7z" fill="#fff"/></svg>Indra<b>Play</b></span>`;
 const I={home:'M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1z',search:'M11 4a7 7 0 105 12l5 5 1.5-1.5-5-5A7 7 0 0011 4z',favs:'M12 21s-8-5.5-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 5.5-8 11-8 11z',profile:'M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9zm-8 9a8 8 0 0116 0z'};
@@ -51,7 +52,10 @@ const ic=p=>`<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"
 const card=m=>{reg[m.key]=m;return`<button class="card" onclick="openM('${m.key}')"><div class="poster" ${m.poster?`role="img" aria-label="${esc(m.title)}" style="background-image:url(${IMG}w342${m.poster})"`:''}>${m.poster?'':esc(m.title)}</div><small>${esc(m.title)}</small><small>${m.year||''}${m.rating?' · ★ '+m.rating.toFixed(1):''}${m.type=='tv'?' · TV':''}</small></button>`};
 function openM(k){S.prev=S.tab;S.view={k:'detail',key:k};render();scrollTo(0,0);if(k!='test')loadDetail(k)}
 function go(t){stopP();S.tab=t;S.view=null;render();scrollTo(0,0)}
-function fav(k){const i=S.favs.findIndex(f=>f.key==k);if(i>=0)S.favs.splice(i,1);else S.favs.push(reg[k]);save();render()}
+async function fav(k){if(!sb)return alert('Accounts are unavailable right now.');if(!S.user){S.authMsg='Log in to save favorites.';S.authMode='login';go('profile');return}
+ const m=reg[k],i=S.favs.findIndex(f=>f.key==k);
+ if(i>=0){S.favs.splice(i,1);render();const{error}=await sb.from('favorites').delete().eq('media_key',k);if(error){S.favs.push(m);render();alert('Could not remove: '+error.message)}}
+ else{S.favs.push(m);render();const{error}=await sb.from('favorites').insert({user_id:S.user.id,media_key:k,media_type:m.type,tmdb_id:m.id,title:m.title,poster_path:m.poster,backdrop_path:m.backdrop,year:m.year,rating:m.rating,overview:m.overview});if(error){S.favs=S.favs.filter(f=>f.key!=k);render();alert('Could not save: '+error.message)}}}
 const sk='<div class="sk"></div>';
 function rowShell(id,t){return`<h2>${t}</h2><div id="r-${id}">${sk}</div>`}
 async function fillRow(id,path,params,type){const el=document.getElementById('r-'+id);try{const j=await api(path,params);const l=j.results.map(x=>norm(x,type)).filter(m=>m.poster);home.rows[id]=l;paint(id)}catch(e){if(el)el.innerHTML=`<p class="err">Could not load: ${esc(e.message)}</p>`}}
@@ -70,8 +74,48 @@ function onQ(v){S.q=v;clearTimeout(T);T=setTimeout(doSearch,350)}
 async function doSearch(){const el=document.getElementById('res');if(!el)return;const q=S.q.trim();if(!q){el.innerHTML='<p class="muted pad" style="margin-top:16px">Type a title to search movies and TV shows.</p>';return}
  el.innerHTML=sk;try{const j=await api('search/multi',{query:q,include_adult:'false'});const l=j.results.filter(x=>x.media_type!='person').map(x=>norm(x)).filter(m=>m.poster);if(S.q.trim()!=q)return;
  el.innerHTML=l.length?`<div class="grid">${l.map(card).join('')}</div>`:`<p class="muted pad" style="margin-top:16px">No results for “${esc(q)}”. Try another title.</p>`}catch(e){el.innerHTML=`<p class="err">Search failed: ${esc(e.message)}</p>`}}
-function favsV(){return`<h2>My Favorites</h2>${S.favs.length?`<div class="grid">${S.favs.map(card).join('')}</div>`:'<p class="muted pad">Nothing here yet. Open a title and tap Add to Favorites.</p>'}<div class="note">Favorites are saved in this browser for now. With Supabase (next stage) they will follow your account.</div>`}
-function profileV(){return`<h2>Profile</h2><div class="note">Accounts and subscriptions are coming in the next stages (Supabase and a Nigerian payment provider).</div>`}
+function favsV(){if(!S.user)return`<h2>My Favorites</h2><p class="muted pad">Log in to see and save your favorites. They follow your account on any device.</p><div class="pad" style="margin-top:14px"><button class="btn" onclick="S.authMode='login';go('profile')">Log in or sign up</button></div>`;
+ return`<h2>My Favorites</h2>${S.favs.length?`<div class="grid">${S.favs.map(card).join('')}</div>`:'<p class="muted pad">Nothing here yet. Open a title and tap Add to Favorites.</p>'}`}
+const $v=id=>{const e=document.getElementById(id);return e?e.value:''};
+const msg=t=>{S.authMsg=t;const e=document.getElementById('am');if(e){e.textContent=t;e.style.display=t?'block':'none'}};
+const friendly=m=>/invalid login/i.test(m)?'Wrong email or password.':/already registered/i.test(m)?'That email already has an account. Try logging in.':/not confirmed/i.test(m)?'Please confirm your email first (check your inbox).':/rate limit/i.test(m)?'Too many attempts. Please wait a few minutes and try again.':m;
+const am=()=>`<div class="note" id="am" style="display:${S.authMsg?'block':'none'}">${esc(S.authMsg)}</div>`;
+function setMode(m){S.authMode=m;S.authMsg='';render()}
+function profileV(){if(!sb)return'<h2>Profile</h2><p class="err">Accounts could not load. Check your connection and refresh.</p>';
+ if(S.recovery)return`<h2>Set a new password</h2>${am()}<div class="pad" style="display:grid;gap:10px"><input class="search" id="np" type="password" placeholder="New password (min 8 characters)" autocomplete="new-password"><button class="btn" onclick="newPw()">Save new password</button></div>`;
+ if(!S.user){const m=S.authMode;return`<h2>${m=='signup'?'Create your account':m=='forgot'?'Reset your password':'Log in'}</h2>${am()}<div class="pad" style="display:grid;gap:10px">
+ <input class="search" id="em" type="email" placeholder="Email" autocomplete="email">
+ ${m!='forgot'?`<input class="search" id="pw" type="password" placeholder="Password (min 8 characters)" autocomplete="${m=='signup'?'new-password':'current-password'}">`:''}
+ <button class="btn" id="go" onclick="doAuth()" style="justify-content:center">${m=='signup'?'Sign up':m=='forgot'?'Send reset link':'Log in'}</button>
+ ${m=='login'?'<button class="btn alt" disabled style="justify-content:center">Google sign-in (not set up yet)</button>':''}
+ <div class="muted" style="text-align:center;line-height:2">${m!='login'?'<a href="#" onclick="setMode(\'login\');return false" style="color:var(--v)">Log in</a> · ':''}${m!='signup'?'<a href="#" onclick="setMode(\'signup\');return false" style="color:var(--v)">Create account</a> · ':''}${m!='forgot'?'<a href="#" onclick="setMode(\'forgot\');return false" style="color:var(--v)">Forgot password?</a>':''}</div></div>`}
+ const h=S.hist.map(x=>`<span class="chip">${esc(x.title)}</span>`).join('');
+ return`<h2>Profile</h2><div class="note"><b style="color:#fff">${esc(S.user.email)}</b><br>Plan: ${S.plan=='premium'?'Premium':'Free'}</div>
+ <h2>Recently watched</h2><div class="pad">${h||'<p class="muted">Nothing watched yet.</p>'}</div>
+ <h2>Change password</h2>${am()}<div class="pad" style="display:grid;gap:10px"><input class="search" id="np" type="password" placeholder="New password (min 8 characters)" autocomplete="new-password"><button class="btn alt" onclick="newPw()" style="justify-content:center">Update password</button></div>
+ <h2>Plans</h2><div class="note"><b style="color:#fff">Free</b>: browse, free-plan content, ads where supported.<br><b style="color:#fff">Premium · ₦1,000/month (proposed)</b>: eligible premium content, ad-free where supported.<br><br>Payments are not connected yet, so Subscribe is off. Premium will unlock only after a payment is verified on the server.</div>
+ <div class="pad" style="display:grid;gap:10px"><button class="btn" disabled style="justify-content:center">Subscribe (coming soon)</button><button class="btn alt" onclick="sb.auth.signOut()" style="justify-content:center">Log out</button></div>`}
+async function doAuth(){const em=$v('em').trim(),pw=$v('pw'),m=S.authMode;
+ if(!/^\S+@\S+\.\S+$/.test(em))return msg('Enter a valid email address.');
+ if(m!='forgot'&&pw.length<8)return msg('Password must be at least 8 characters.');
+ const b=document.getElementById('go');b.disabled=true;msg('Please wait…');let r;
+ try{if(m=='signup'){r=await sb.auth.signUp({email:em,password:pw,options:{emailRedirectTo:location.origin}});if(!r.error)msg(r.data.session?'':'Account created. Check your email to confirm it, then log in.')}
+ else if(m=='forgot'){r=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin});if(!r.error)msg('If that email has an account, a reset link is on its way.')}
+ else{r=await sb.auth.signInWithPassword({email:em,password:pw});if(!r.error)msg('')}
+ if(r.error)msg(friendly(r.error.message))}catch(e){msg('Network problem. Please try again.')}
+ b.disabled=false}
+async function newPw(){const p=$v('np');if(p.length<8)return msg('Password must be at least 8 characters.');
+ const{error}=await sb.auth.updateUser({password:p});if(error)return msg(friendly(error.message));
+ S.recovery=false;msg('Password updated.');render()}
+async function loadData(){const[f,h,p]=await Promise.all([sb.from('favorites').select('*').order('created_at',{ascending:false}),sb.from('watch_history').select('*').order('updated_at',{ascending:false}).limit(20),sb.from('subscriptions').select('plan,status').maybeSingle()]);
+ S.favs=(f.data||[]).map(r=>({key:r.media_key,type:r.media_type,id:r.tmdb_id,title:r.title,poster:r.poster_path,backdrop:r.backdrop_path,year:r.year,rating:r.rating,overview:r.overview}));
+ S.hist=h.data||[];S.plan=p.data&&p.data.status=='active'?p.data.plan:'free'}
+async function setUser(u){S.user=u;if(u){try{await loadData()}catch(e){}}else{S.favs=[];S.hist=[];S.plan='free'}render()}
+async function loadUser(){if(!sb)return;const{data}=await sb.auth.getSession();await setUser(data.session?data.session.user:null);
+ sb.auth.onAuthStateChange((ev,ses)=>{if(ev=='PASSWORD_RECOVERY'){S.recovery=true;S.tab='profile';S.view=null;render()}
+  const u=ses?ses.user:null;if((u&&u.id)!==(S.user&&S.user.id))setTimeout(()=>setUser(u),0)})}
+async function logWatch(){if(!sb||!S.user)return;await sb.from('watch_history').upsert({user_id:S.user.id,media_key:'test',title:TEST.title,progress_seconds:0,updated_at:new Date().toISOString()},{onConflict:'user_id,media_key'});
+ const{data}=await sb.from('watch_history').select('*').order('updated_at',{ascending:false}).limit(20);S.hist=data||[]}
 function detailV(){const m=reg[S.view.key];if(!m)return'<p class="err">Title not found.</p>';const f=S.favs.some(x=>x.key==m.key);const bg=m.backdrop?`linear-gradient(to top,#09090D 5%,#09090D44 80%),url(${IMG}w780${m.backdrop})`:'linear-gradient(160deg,#4c1d95,#09090D)';
  return`<button class="back btn alt" onclick="S.view=null;render()">← Back</button><div class="hero" style="background-image:${bg};min-height:240px;margin-top:6px"><h1>${esc(m.title)}</h1></div>
  <div class="pad" style="margin-top:14px"><div id="meta"><span class="chip">${m.year||''}</span>${m.rating?`<span class="chip">★ ${m.rating.toFixed(1)}</span>`:''}</div>
@@ -86,7 +130,7 @@ async function loadDetail(k){const m=reg[k];try{const[d,s]=await Promise.all([ap
  catch(e){const el=document.getElementById('sim');if(el)el.innerHTML=`<p class="err">Could not load more details: ${esc(e.message)}</p>`}}
 /* ---- player (test reel generated in-browser) ---- */
 let vid,genUrl;const fmt=t=>isFinite(t)?Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0'):'0:00';
-function play(){S.view={k:'play'};render();scrollTo(0,0);initPlayer()}
+function play(){S.view={k:'play'};render();scrollTo(0,0);initPlayer();logWatch()}
 function playerV(){return`<button class="back btn alt" onclick="stopP();S.view={k:'detail',key:'test'};render()">← Details</button>
 <div class="player" style="margin-top:6px"><video id="v" playsinline preload="metadata"></video><div class="spin" id="sp">Loading video…</div></div>
 <div class="ctl"><button id="pp" aria-label="Play or pause">▶</button><input type="range" id="sk" min="0" max="1000" value="0" aria-label="Progress"><span id="tm" class="muted" style="font-size:12px;min-width:76px;text-align:right">0:00</span></div>
@@ -116,5 +160,5 @@ function render(){const v=S.view;let h,after;
  else{h=`<header>${logo}<div style="display:flex;gap:8px"><button class="ic" aria-label="Search" onclick="go('search')">${ic(I.search)}</button><button class="ic" aria-label="Profile" onclick="go('profile')">${ic(I.profile)}</button></div></header>`+({home:homeV,search:searchV,favs:favsV,profile:profileV}[S.tab])();after=S.tab}
  $.innerHTML=h+`<footer>This product uses the TMDB API but is not endorsed or certified by TMDB.</footer><nav>${[['home','Home'],['search','Search'],['favs','Favorites'],['profile','Profile']].map(([k,l])=>`<button class="${S.tab==k&&!v?'on':''}" onclick="go('${k}')">${ic(I[k])}${l}</button>`).join('')}</nav>`;
  if(after=='home')loadHome();if(after=='search')doSearch()}
-render();
+render();loadUser();
 </script></body></html>
