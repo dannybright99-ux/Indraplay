@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>IndraPlay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#09090D">
+<style>
+:root{--bg:#09090D;--p:#8B5CF6;--v:#A855F7;--card:#17141F;--s:#A1A1AA;color-scheme:dark}
+*{box-sizing:border-box;margin:0}html,body{background:var(--bg);color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow-x:hidden}
+body{padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(76px + env(safe-area-inset-bottom,0px));max-width:900px;margin:auto}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:22px}.logo b{background:linear-gradient(90deg,var(--p),var(--v));-webkit-background-clip:text;background-clip:text;color:transparent}
+.ic{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--card)}
+.hero{margin:0 16px;border-radius:20px;min-height:360px;padding:20px;display:flex;flex-direction:column;justify-content:flex-end;background-size:cover;background-position:center top}
+.hero p{color:#ddd;font-size:14px;line-height:1.5;margin:8px 0 14px;max-width:520px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+h1{font-size:28px}h2{font-size:18px;margin:24px 16px 10px}
+.btn{background:linear-gradient(90deg,var(--p),var(--v));padding:13px 22px;border-radius:12px;font-weight:700;min-height:46px;display:inline-flex;align-items:center;gap:8px}
+.btn.alt{background:var(--card);border:1px solid #2c2740}.btn[disabled]{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:12px;overflow-x:auto;padding:0 16px;scrollbar-width:none}.row::-webkit-scrollbar{display:none}
+.card{flex:0 0 130px;text-align:left}.grid .card{flex:none}
+.poster{aspect-ratio:2/3;border-radius:14px;background:var(--card) center/cover;display:flex;align-items:flex-end;padding:8px;font-weight:700;font-size:13px;overflow:hidden}
+.card small{display:block;color:var(--s);font-size:12px;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+nav{position:fixed;bottom:0;left:0;right:0;max-width:900px;margin:auto;display:flex;background:#0f0d16f2;border-top:1px solid #231f30;padding:6px 0 calc(6px + env(safe-area-inset-bottom,0px));z-index:5}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--s);min-height:48px}nav button.on{color:var(--v)}
+.pad{padding:0 16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:12px;padding:16px}
+input.search{width:100%;padding:14px 16px;border-radius:12px;border:1px solid #2c2740;background:var(--card);color:#fff;font-size:16px}
+.muted{color:var(--s);font-size:14px;line-height:1.5}
+.note{background:var(--card);border:1px solid #2c2740;border-radius:12px;padding:12px 14px;margin:12px 16px;font-size:13px;color:var(--s);line-height:1.5}
+.chip{display:inline-block;background:var(--card);border-radius:20px;padding:4px 10px;font-size:12px;margin:0 6px 6px 0}
+.back{margin:8px 12px}.err{color:#f87171;font-size:14px;padding:8px 16px}
+.sk{height:200px;margin:0 16px;border-radius:14px;background:linear-gradient(90deg,#17141F,#211c2e,#17141F);background-size:200% 100%;animation:sh 1.2s infinite}@keyframes sh{to{background-position:-200% 0}}
+.player{position:relative;background:#000;aspect-ratio:16/9;width:100%}.player video{width:100%;height:100%;display:block}
+.ctl{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card)}.ctl input{accent-color:var(--p);flex:1;min-width:0}
+.ctl button{width:44px;height:44px;flex:none;border-radius:10px}
+.spin{position:absolute;inset:0;display:grid;place-items:center;background:#000a;text-align:center;font-size:14px;padding:16px}
+footer{padding:24px 16px;font-size:11px;color:var(--s);text-align:center;line-height:1.5}
+</style></head><body><div id="app"></div>
+<script>
+const G=[['Action',28],['Comedy',35],['Drama',18],['Horror',27],['Romance',10749],['Science Fiction',878]];
+const IMG='https://image.tmdb.org/t/p/';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(path,params={}){const r=await fetch('/api/tmdb?'+new URLSearchParams({path,...params}));const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Request failed ('+r.status+')');return j}
+const norm=(x,t)=>{t=x.media_type||t;return{key:t+':'+x.id,type:t,id:x.id,title:x.title||x.name||'Untitled',poster:x.poster_path,backdrop:x.backdrop_path,year:(x.release_date||x.first_air_date||'').slice(0,4),rating:x.vote_count>0?x.vote_average:null,overview:x.overview||''}};
+const TEST={key:'test',type:'test',id:0,title:'IndraPlay Test Reel',poster:null,backdrop:null,year:'2026',rating:null,overview:'An original 8-second clip generated in your browser to confirm the player works.'};
+let S={tab:'home',view:null,q:'',favs:[],prev:null},T,home={rows:{}};
+try{S.favs=JSON.parse(localStorage.getItem('ip_favs')||'[]')}catch(e){}
+const save=()=>{try{localStorage.setItem('ip_favs',JSON.stringify(S.favs))}catch(e){}};
+const $=document.getElementById('app'),reg={};
+const logo=`<span class="logo"><svg width="30" height="30" viewBox="0 0 32 32"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#A855F7"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#g)"/><path d="M12 9l12 7-12 7z" fill="#fff"/></svg>Indra<b>Play</b></span>`;
+const I={home:'M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1z',search:'M11 4a7 7 0 105 12l5 5 1.5-1.5-5-5A7 7 0 0011 4z',favs:'M12 21s-8-5.5-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 5.5-8 11-8 11z',profile:'M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9zm-8 9a8 8 0 0116 0z'};
+const ic=p=>`<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="${p}"/></svg>`;
+const card=m=>{reg[m.key]=m;return`<button class="card" onclick="openM('${m.key}')"><div class="poster" ${m.poster?`role="img" aria-label="${esc(m.title)}" style="background-image:url(${IMG}w342${m.poster})"`:''}>${m.poster?'':esc(m.title)}</div><small>${esc(m.title)}</small><small>${m.year||''}${m.rating?' · ★ '+m.rating.toFixed(1):''}${m.type=='tv'?' · TV':''}</small></button>`};
+function openM(k){S.prev=S.tab;S.view={k:'detail',key:k};render();scrollTo(0,0);if(k!='test')loadDetail(k)}
+function go(t){stopP();S.tab=t;S.view=null;render();scrollTo(0,0)}
+function fav(k){const i=S.favs.findIndex(f=>f.key==k);if(i>=0)S.favs.splice(i,1);else S.favs.push(reg[k]);save();render()}
+const sk='<div class="sk"></div>';
+function rowShell(id,t){return`<h2>${t}</h2><div id="r-${id}">${sk}</div>`}
+async function fillRow(id,path,params,type){const el=document.getElementById('r-'+id);try{const j=await api(path,params);const l=j.results.map(x=>norm(x,type)).filter(m=>m.poster);home.rows[id]=l;paint(id)}catch(e){if(el)el.innerHTML=`<p class="err">Could not load: ${esc(e.message)}</p>`}}
+function paint(id){const el=document.getElementById('r-'+id);if(el)el.innerHTML=`<div class="row">${home.rows[id].map(card).join('')}</div>`}
+function homeV(){return`<div id="hero"><div class="hero" style="background:var(--card)"><h1>Loading…</h1></div></div>
+<h2>Test video</h2><div class="row">${card(TEST)}</div>
+${rowShell('trend','Trending Movies')}${rowShell('pop','Popular Movies')}${rowShell('new','Recently Released')}${rowShell('tv','Trending TV Shows')}${G.map(g=>rowShell('g'+g[1],g[0])).join('')}`}
+function loadHome(){const R=(id,p,q,t)=>home.rows[id]?paint(id):fillRow(id,p,q,t);
+ if(home.rows.trend){paint('trend');heroPaint()}else fillRow('trend','trending/movie/week',{},'movie').then(heroPaint);
+ R('pop','movie/popular',{},'movie');R('new','movie/now_playing',{},'movie');R('tv','trending/tv/week',{},'tv');
+ G.forEach(g=>R('g'+g[1],'discover/movie',{with_genres:g[1],sort_by:'popularity.desc'},'movie'))}
+function heroPaint(){const m=(home.rows.trend||[]).find(x=>x.backdrop),el=document.getElementById('hero');if(!el||!m)return;reg[m.key]=m;
+ el.innerHTML=`<div class="hero" style="background-image:linear-gradient(to top,#09090D 8%,#09090D55 70%),url(${IMG}w780${m.backdrop})"><span class="chip" style="width:fit-content">Featured</span><h1>${esc(m.title)}</h1><p>${esc(m.overview)}</p><div><button class="btn" onclick="openM('${m.key}')">View details</button></div></div>`}
+function searchV(){return`<div class="pad"><input class="search" id="q" placeholder="Search movies and TV shows" value="${esc(S.q)}" oninput="onQ(this.value)" autofocus></div><div id="res"></div>`}
+function onQ(v){S.q=v;clearTimeout(T);T=setTimeout(doSearch,350)}
+async function doSearch(){const el=document.getElementById('res');if(!el)return;const q=S.q.trim();if(!q){el.innerHTML='<p class="muted pad" style="margin-top:16px">Type a title to search movies and TV shows.</p>';return}
+ el.innerHTML=sk;try{const j=await api('search/multi',{query:q,include_adult:'false'});const l=j.results.filter(x=>x.media_type!='person').map(x=>norm(x)).filter(m=>m.poster);if(S.q.trim()!=q)return;
+ el.innerHTML=l.length?`<div class="grid">${l.map(card).join('')}</div>`:`<p class="muted pad" style="margin-top:16px">No results for “${esc(q)}”. Try another title.</p>`}catch(e){el.innerHTML=`<p class="err">Search failed: ${esc(e.message)}</p>`}}
+function favsV(){return`<h2>My Favorites</h2>${S.favs.length?`<div class="grid">${S.favs.map(card).join('')}</div>`:'<p class="muted pad">Nothing here yet. Open a title and tap Add to Favorites.</p>'}<div class="note">Favorites are saved in this browser for now. With Supabase (next stage) they will follow your account.</div>`}
+function profileV(){return`<h2>Profile</h2><div class="note">Accounts and subscriptions are coming in the next stages (Supabase and a Nigerian payment provider).</div>`}
+function detailV(){const m=reg[S.view.key];if(!m)return'<p class="err">Title not found.</p>';const f=S.favs.some(x=>x.key==m.key);const bg=m.backdrop?`linear-gradient(to top,#09090D 5%,#09090D44 80%),url(${IMG}w780${m.backdrop})`:'linear-gradient(160deg,#4c1d95,#09090D)';
+ return`<button class="back btn alt" onclick="S.view=null;render()">← Back</button><div class="hero" style="background-image:${bg};min-height:240px;margin-top:6px"><h1>${esc(m.title)}</h1></div>
+ <div class="pad" style="margin-top:14px"><div id="meta"><span class="chip">${m.year||''}</span>${m.rating?`<span class="chip">★ ${m.rating.toFixed(1)}</span>`:''}</div>
+ <p class="muted" style="margin:6px 0 16px">${esc(m.overview)||'No synopsis available.'}</p>
+ <div style="display:flex;gap:10px;flex-wrap:wrap">${m.key=='test'?'<button class="btn" onclick="play()">▶ Watch Now</button>':'<button class="btn" disabled>Not available to stream</button>'}
+ <button class="btn alt" onclick="fav('${m.key}')">${f?'♥ In Favorites':'♡ Add to Favorites'}</button></div>
+ ${m.key=='test'?'':'<p class="muted" style="margin-top:10px">No authorized video source is attached to this title.</p>'}</div><div id="sim"></div>`}
+async function loadDetail(k){const m=reg[k];try{const[d,s]=await Promise.all([api(m.type+'/'+m.id),api(m.type+'/'+m.id+'/similar').catch(()=>({results:[]}))]);if(!S.view||S.view.key!=k)return;
+ const rt=d.runtime||(d.episode_run_time||[])[0],meta=document.getElementById('meta');
+ if(meta)meta.innerHTML+=(d.genres||[]).map(g=>`<span class="chip">${esc(g.name)}</span>`).join('')+(rt?`<span class="chip">${rt} min</span>`:'')+(m.type=='tv'&&d.number_of_seasons?`<span class="chip">${d.number_of_seasons} season(s)</span>`:'');
+ const l=s.results.map(x=>norm(x,m.type)).filter(x=>x.poster).slice(0,10),el=document.getElementById('sim');if(el&&l.length)el.innerHTML=`<h2>Similar</h2><div class="row">${l.map(card).join('')}</div>`}
+ catch(e){const el=document.getElementById('sim');if(el)el.innerHTML=`<p class="err">Could not load more details: ${esc(e.message)}</p>`}}
+/* ---- player (test reel generated in-browser) ---- */
+let vid,genUrl;const fmt=t=>isFinite(t)?Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0'):'0:00';
+function play(){S.view={k:'play'};render();scrollTo(0,0);initPlayer()}
+function playerV(){return`<button class="back btn alt" onclick="stopP();S.view={k:'detail',key:'test'};render()">← Details</button>
+<div class="player" style="margin-top:6px"><video id="v" playsinline preload="metadata"></video><div class="spin" id="sp">Loading video…</div></div>
+<div class="ctl"><button id="pp" aria-label="Play or pause">▶</button><input type="range" id="sk" min="0" max="1000" value="0" aria-label="Progress"><span id="tm" class="muted" style="font-size:12px;min-width:76px;text-align:right">0:00</span></div>
+<div class="ctl" style="padding-top:0"><span class="muted" style="font-size:12px">Vol</span><input type="range" id="vo" min="0" max="1" step="0.05" value="1" aria-label="Volume"><button id="fs" aria-label="Fullscreen">⛶</button></div>
+<p class="muted pad" style="margin-top:14px">Test clip generated in your browser. Real authorized video URLs will come from the server.</p>`}
+function stopP(){if(vid){vid.pause();vid.removeAttribute('src');vid.load()}vid=null}
+function initPlayer(){vid=document.getElementById('v');const sp=document.getElementById('sp'),pp=document.getElementById('pp'),sk=document.getElementById('sk'),tm=document.getElementById('tm');
+ vid.onwaiting=()=>{sp.style.display='grid';sp.textContent='Buffering…'};vid.oncanplay=vid.onplaying=()=>sp.style.display='none';
+ vid.onplay=()=>pp.textContent='⏸';vid.onpause=()=>pp.textContent='▶';
+ vid.ontimeupdate=()=>{if(isFinite(vid.duration)){sk.value=vid.currentTime/vid.duration*1000;tm.textContent=fmt(vid.currentTime)+' / '+fmt(vid.duration)}};
+ vid.onerror=()=>{sp.style.display='grid';sp.textContent='Playback error. The video could not be loaded.'};
+ pp.onclick=()=>vid.paused?vid.play():vid.pause();sk.oninput=()=>{if(isFinite(vid.duration))vid.currentTime=sk.value/1000*vid.duration};
+ document.getElementById('vo').oninput=e=>vid.volume=e.target.value;
+ document.getElementById('fs').onclick=()=>{const p=vid.parentElement;if(p.requestFullscreen)p.requestFullscreen();else if(p.webkitRequestFullscreen)p.webkitRequestFullscreen();else if(vid.webkitEnterFullscreen)vid.webkitEnterFullscreen()};
+ makeTest(sp)}
+async function makeTest(sp){const v=vid;try{if(genUrl){v.src=genUrl;return}if(!window.MediaRecorder)throw 0;sp.textContent='Generating test video (8 seconds)…';
+ const c=document.createElement('canvas');c.width=640;c.height=360;const x=c.getContext('2d');const mt=['video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+ const rec=new MediaRecorder(c.captureStream(30),mt?{mimeType:mt}:{});const ch=[];rec.ondataavailable=e=>ch.push(e.data);const t0=performance.now();let raf;
+ const draw=()=>{const t=(performance.now()-t0)/1000,g=x.createLinearGradient(0,0,640,360);g.addColorStop(0,`hsl(${260+t*20} 70% 35%)`);g.addColorStop(1,'#09090D');x.fillStyle=g;x.fillRect(0,0,640,360);
+  x.fillStyle='#fff';const px=320+Math.sin(t*2)*60;x.beginPath();x.moveTo(px-30,150);x.lineTo(px+40,180);x.lineTo(px-30,210);x.fill();x.font='bold 30px sans-serif';x.textAlign='center';x.fillText('IndraPlay Test Reel',320,290);x.font='18px sans-serif';x.fillText(t.toFixed(1)+' s',320,320);raf=requestAnimationFrame(draw)};
+ draw();rec.start();await new Promise(r=>setTimeout(r,8000));const done=new Promise(r=>rec.onstop=r);rec.stop();await done;cancelAnimationFrame(raf);
+ genUrl=URL.createObjectURL(new Blob(ch,{type:rec.mimeType}));if(vid!==v)return;
+ v.onloadedmetadata=()=>{if(v.duration===Infinity){v.currentTime=1e101;const h=v.ontimeupdate;v.ontimeupdate=()=>{v.currentTime=0;v.ontimeupdate=h}}};v.src=genUrl;sp.style.display='none'}
+ catch(e){sp.style.display='grid';sp.textContent='This browser cannot generate the test video. Try Chrome or Safari.'}}
+function render(){const v=S.view;let h,after;
+ if(v&&v.k=='play')h=playerV();else if(v&&v.k=='detail')h=detailV();
+ else{h=`<header>${logo}<div style="display:flex;gap:8px"><button class="ic" aria-label="Search" onclick="go('search')">${ic(I.search)}</button><button class="ic" aria-label="Profile" onclick="go('profile')">${ic(I.profile)}</button></div></header>`+({home:homeV,search:searchV,favs:favsV,profile:profileV}[S.tab])();after=S.tab}
+ $.innerHTML=h+`<footer>This product uses the TMDB API but is not endorsed or certified by TMDB.</footer><nav>${[['home','Home'],['search','Search'],['favs','Favorites'],['profile','Profile']].map(([k,l])=>`<button class="${S.tab==k&&!v?'on':''}" onclick="go('${k}')">${ic(I[k])}${l}</button>`).join('')}</nav>`;
+ if(after=='home')loadHome();if(after=='search')doSearch()}
+render();
+</script></body></html>
