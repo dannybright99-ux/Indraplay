@@ -32,6 +32,17 @@ input.search{width:100%;padding:14px 16px;border-radius:12px;border:1px solid #2
 .ctl{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card)}.ctl input{accent-color:var(--p);flex:1;min-width:0}
 .ctl button{width:44px;height:44px;flex:none;border-radius:10px}
 .spin{position:absolute;inset:0;display:grid;place-items:center;background:#000a;text-align:center;font-size:14px;padding:16px}
+.plans{display:grid;gap:12px;padding:0 16px;margin-top:14px}.plan{background:var(--card);border-radius:16px;padding:16px;border:1px solid #2c2740}.plan.pr{border-color:var(--p)}.plan li{margin:6px 0 0 18px;font-size:14px;color:var(--s)}
+.seg{display:flex;background:var(--card);border-radius:12px;padding:4px;margin-top:6px}.seg button{flex:1;padding:11px 6px;border-radius:9px;font-weight:600;font-size:14px;min-height:44px}.seg button.on{background:linear-gradient(90deg,var(--p),var(--v))}.seg span{display:block;font-size:11px;font-weight:500;opacity:.9}
+.price{font-size:32px;font-weight:800;margin:8px 0}.price small{font-size:14px;color:var(--s);font-weight:500}
+.wl{position:relative;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:flex-end;padding:24px 20px calc(28px + env(safe-area-inset-bottom,0px));overflow:hidden}
+.wl::before{content:"";position:absolute;inset:-20% -20% auto;height:70%;background:radial-gradient(closest-side,#8B5CF655,transparent)}
+.tiles{position:absolute;top:6%;left:-10%;right:-10%;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;transform:rotate(-10deg);opacity:.9}
+.tiles i{aspect-ratio:2/3;border-radius:14px;background:linear-gradient(160deg,hsl(var(--h) 70% 42%),hsl(calc(var(--h) + 40) 60% 14%));animation:fl 6s ease-in-out infinite;animation-delay:var(--d)}
+.tiles i:nth-child(even){margin-top:28px}@keyframes fl{50%{transform:translateY(-12px)}}
+.wl-body{position:relative;background:linear-gradient(to top,#09090D 70%,transparent);padding-top:90px;margin:0 -20px;padding-left:20px;padding-right:20px}
+.wl h1{font-size:30px;line-height:1.15;margin:18px 0 8px}.wl .btn{width:100%;justify-content:center;margin-top:12px}
+.gate{padding:16px 4px 40px}.splash{min-height:100vh;display:grid;place-items:center}
 footer{padding:24px 16px;font-size:11px;color:var(--s);text-align:center;line-height:1.5}
 </style></head><body><div id="app"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -44,10 +55,10 @@ const norm=(x,t)=>{t=x.media_type||t;return{key:t+':'+x.id,type:t,id:x.id,title:
 const TEST={key:'test',type:'test',id:0,title:'IndraPlay Test Reel',poster:null,backdrop:null,year:'2026',rating:null,overview:'An original 8-second clip generated in your browser to confirm the player works.'};
 const SB_URL='https://qfcfdrzlcdgdrqspxyro.supabase.co',SB_KEY='sb_publishable_MXB4LH8VSaypO3dbZ-dACg_hqaLE-Og';
 let sb=null;try{sb=window.supabase.createClient(SB_URL,SB_KEY)}catch(e){}
-let S={tab:'home',view:null,q:'',favs:[],hist:[],user:null,plan:'free',authMode:'login',authMsg:'',recovery:false,prev:null},T,home={rows:{}};
+let S={tab:'home',view:null,q:'',favs:[],hist:[],user:null,plan:'free',authMode:'login',authMsg:'',recovery:false,gate:'welcome',bill:'month',loading:true,prev:null},T,home={rows:{}};
 const $=document.getElementById('app'),reg={};
 const logo=`<span class="logo"><svg width="30" height="30" viewBox="0 0 32 32"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#A855F7"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#g)"/><path d="M12 9l12 7-12 7z" fill="#fff"/></svg>Indra<b>Play</b></span>`;
-const I={home:'M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1z',search:'M11 4a7 7 0 105 12l5 5 1.5-1.5-5-5A7 7 0 0011 4z',favs:'M12 21s-8-5.5-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 5.5-8 11-8 11z',profile:'M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9zm-8 9a8 8 0 0116 0z'};
+const I={premium:'M5 16L3 6l5 4 4-6 4 6 5-4-2 10zM5 18h14v2H5z',home:'M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1z',search:'M11 4a7 7 0 105 12l5 5 1.5-1.5-5-5A7 7 0 0011 4z',favs:'M12 21s-8-5.5-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 5.5-8 11-8 11z',profile:'M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9zm-8 9a8 8 0 0116 0z'};
 const ic=p=>`<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="${p}"/></svg>`;
 const card=m=>{reg[m.key]=m;return`<button class="card" onclick="openM('${m.key}')"><div class="poster" ${m.poster?`role="img" aria-label="${esc(m.title)}" style="background-image:url(${IMG}w342${m.poster})"`:''}>${m.poster?'':esc(m.title)}</div><small>${esc(m.title)}</small><small>${m.year||''}${m.rating?' · ★ '+m.rating.toFixed(1):''}${m.type=='tv'?' · TV':''}</small></button>`};
 function openM(k){S.prev=S.tab;S.view={k:'detail',key:k};render();scrollTo(0,0);if(k!='test')loadDetail(k)}
@@ -80,7 +91,7 @@ const $v=id=>{const e=document.getElementById(id);return e?e.value:''};
 const msg=t=>{S.authMsg=t;const e=document.getElementById('am');if(e){e.textContent=t;e.style.display=t?'block':'none'}};
 const friendly=m=>/invalid login/i.test(m)?'Wrong email or password.':/already registered/i.test(m)?'That email already has an account. Try logging in.':/not confirmed/i.test(m)?'Please confirm your email first (check your inbox).':/rate limit/i.test(m)?'Too many attempts. Please wait a few minutes and try again.':m;
 const am=()=>`<div class="note" id="am" style="display:${S.authMsg?'block':'none'}">${esc(S.authMsg)}</div>`;
-function setMode(m){S.authMode=m;S.authMsg='';render()}
+function setMode(m){S.gate=m;if(m!='welcome')S.authMode=m;S.authMsg='';render()}
 function profileV(){if(!sb)return'<h2>Profile</h2><p class="err">Accounts could not load. Check your connection and refresh.</p>';
  if(S.recovery)return`<h2>Set a new password</h2>${am()}<div class="pad" style="display:grid;gap:10px"><input class="search" id="np" type="password" placeholder="New password (min 8 characters)" autocomplete="new-password"><button class="btn" onclick="newPw()">Save new password</button></div>`;
  if(!S.user){const m=S.authMode;return`<h2>${m=='signup'?'Create your account':m=='forgot'?'Reset your password':'Log in'}</h2>${am()}<div class="pad" style="display:grid;gap:10px">
@@ -93,8 +104,8 @@ function profileV(){if(!sb)return'<h2>Profile</h2><p class="err">Accounts could 
  return`<h2>Profile</h2><div class="note"><b style="color:#fff">${esc(S.user.email)}</b><br>Plan: ${S.plan=='premium'?'Premium':'Free'}</div>
  <h2>Recently watched</h2><div class="pad">${h||'<p class="muted">Nothing watched yet.</p>'}</div>
  <h2>Change password</h2>${am()}<div class="pad" style="display:grid;gap:10px"><input class="search" id="np" type="password" placeholder="New password (min 8 characters)" autocomplete="new-password"><button class="btn alt" onclick="newPw()" style="justify-content:center">Update password</button></div>
- <h2>Plans</h2><div class="note"><b style="color:#fff">Free</b>: browse, free-plan content, ads where supported.<br><b style="color:#fff">Premium · ₦1,000/month (proposed)</b>: eligible premium content, ad-free where supported.<br><br>Payments are not connected yet, so Subscribe is off. Premium will unlock only after a payment is verified on the server.</div>
- <div class="pad" style="display:grid;gap:10px"><button class="btn" disabled style="justify-content:center">Subscribe (coming soon)</button><button class="btn alt" onclick="sb.auth.signOut()" style="justify-content:center">Log out</button></div>`}
+ <h2>Premium</h2><div class="note">See plans, prices and your subscription status on the Premium tab.</div>
+ <div class="pad" style="display:grid;gap:10px"><button class="btn" onclick="go('premium')" style="justify-content:center">View Premium</button><button class="btn alt" onclick="sb.auth.signOut()" style="justify-content:center">Log out</button></div>`}
 async function doAuth(){const em=$v('em').trim(),pw=$v('pw'),m=S.authMode;
  if(!/^\S+@\S+\.\S+$/.test(em))return msg('Enter a valid email address.');
  if(m!='forgot'&&pw.length<8)return msg('Password must be at least 8 characters.');
@@ -106,12 +117,12 @@ async function doAuth(){const em=$v('em').trim(),pw=$v('pw'),m=S.authMode;
  b.disabled=false}
 async function newPw(){const p=$v('np');if(p.length<8)return msg('Password must be at least 8 characters.');
  const{error}=await sb.auth.updateUser({password:p});if(error)return msg(friendly(error.message));
- S.recovery=false;msg('Password updated.');render()}
+ if(S.recovery){S.tab='home';S.view=null}S.recovery=false;msg('Password updated.');render()}
 async function loadData(){const[f,h,p]=await Promise.all([sb.from('favorites').select('*').order('created_at',{ascending:false}),sb.from('watch_history').select('*').order('updated_at',{ascending:false}).limit(20),sb.from('subscriptions').select('plan,status').maybeSingle()]);
  S.favs=(f.data||[]).map(r=>({key:r.media_key,type:r.media_type,id:r.tmdb_id,title:r.title,poster:r.poster_path,backdrop:r.backdrop_path,year:r.year,rating:r.rating,overview:r.overview}));
  S.hist=h.data||[];S.plan=p.data&&p.data.status=='active'?p.data.plan:'free'}
-async function setUser(u){S.user=u;if(u){try{await loadData()}catch(e){}}else{S.favs=[];S.hist=[];S.plan='free'}render()}
-async function loadUser(){if(!sb)return;const{data}=await sb.auth.getSession();await setUser(data.session?data.session.user:null);
+async function setUser(u){const was=S.user;if(u&&!was){S.tab='home';S.view=null}if(!u){S.tab='home';S.view=null;S.gate='welcome'}S.user=u;if(u){try{await loadData()}catch(e){}}else{S.favs=[];S.hist=[];S.plan='free'}S.loading=false;render()}
+async function loadUser(){if(!sb){S.loading=false;return render()}const{data}=await sb.auth.getSession();await setUser(data.session?data.session.user:null);
  sb.auth.onAuthStateChange((ev,ses)=>{if(ev=='PASSWORD_RECOVERY'){S.recovery=true;S.tab='profile';S.view=null;render()}
   const u=ses?ses.user:null;if((u&&u.id)!==(S.user&&S.user.id))setTimeout(()=>setUser(u),0)})}
 async function logWatch(){if(!sb||!S.user)return;await sb.from('watch_history').upsert({user_id:S.user.id,media_key:'test',title:TEST.title,progress_seconds:0,updated_at:new Date().toISOString()},{onConflict:'user_id,media_key'});
@@ -155,10 +166,33 @@ async function makeTest(sp){const v=vid;try{if(genUrl){v.src=genUrl;return}if(!w
  genUrl=URL.createObjectURL(new Blob(ch,{type:rec.mimeType}));if(vid!==v)return;
  v.onloadedmetadata=()=>{if(v.duration===Infinity){v.currentTime=1e101;const h=v.ontimeupdate;v.ontimeupdate=()=>{v.currentTime=0;v.ontimeupdate=h}}};v.src=genUrl;sp.style.display='none'}
  catch(e){sp.style.display='grid';sp.textContent='This browser cannot generate the test video. Try Chrome or Safari.'}}
-function render(){const v=S.view;let h,after;
+const wrapG=h=>`<div class="gate"><div class="pad"><button onclick="setMode('welcome')" aria-label="Back" class="btn alt" style="padding:10px 16px;min-height:44px">←</button></div>${h}</div>`;
+function gateV(){const m=S.gate;
+ if(S.recovery)return`<div class="gate"><div class="pad" style="margin-top:24px">${logo}</div><h2>Set a new password</h2>${am()}<div class="pad" style="display:grid;gap:10px"><input class="search" id="np" type="password" placeholder="New password (min 8 characters)" autocomplete="new-password"><button class="btn" onclick="newPw()" style="justify-content:center">Save new password</button></div></div>`;
+ if(m=='welcome')return`<div class="wl"><div class="tiles">${[0,1,2,3,4,5,6,7].map(i=>`<i style="--h:${(255+i*22)%360};--d:${i*.5}s"></i>`).join('')}</div>
+ <div class="wl-body"><div style="font-size:28px">${logo}</div><h1>Discover movies and TV you’ll love.</h1><p class="muted">Browse the catalogue, save your favorites and pick up where you left off.</p>
+ <button class="btn" onclick="setMode('signup')">Get Started</button><button class="btn alt" onclick="setMode('login')">Log in</button></div></div>`;
+ return wrapG(`<h2>${m=='signup'?'Create your account':m=='forgot'?'Reset your password':'Welcome back'}</h2>${am()}<div class="pad" style="display:grid;gap:10px">
+ <input class="search" id="em" type="email" placeholder="Email" autocomplete="email">
+ ${m!='forgot'?`<input class="search" id="pw" type="password" placeholder="Password (min 8 characters)" autocomplete="${m=='signup'?'new-password':'current-password'}">`:''}
+ <button class="btn" id="go" onclick="doAuth()" style="justify-content:center">${m=='signup'?'Sign up':m=='forgot'?'Send reset link':'Log in'}</button>
+ ${m=='login'?'<button class="btn alt" disabled style="justify-content:center">Google sign-in (not set up yet)</button>':''}
+ <div class="muted" style="text-align:center;line-height:2">${m!='login'?'<a href="#" onclick="setMode(\'login\');return false" style="color:var(--v)">Log in</a> · ':''}${m!='signup'?'<a href="#" onclick="setMode(\'signup\');return false" style="color:var(--v)">Create account</a> · ':''}${m!='forgot'?'<a href="#" onclick="setMode(\'forgot\');return false" style="color:var(--v)">Forgot password?</a>':''}</div></div>`)}
+function premiumV(){const y=S.bill=='year',p=S.plan=='premium';
+ return`<h2>Premium</h2><div class="note"><b style="color:#fff">Your plan: ${p?'Premium':'Free'}</b><br>${p?'Thank you for subscribing.':'You are not subscribed to Premium.'}</div>
+ <div class="pad"><div class="seg"><button class="${y?'':'on'}" onclick="S.bill='month';render()">Monthly</button><button class="${y?'on':''}" onclick="S.bill='year';render()">Yearly<span>Save ₦2,000</span></button></div></div>
+ <div class="plans"><div class="plan pr"><b>Premium</b><div class="price">${y?'₦10,000':'₦1,000'}<small> / ${y?'year':'month'}</small></div>
+ ${y?'<p class="muted">About ₦833 a month, instead of ₦12,000 when paid monthly.</p>':''}
+ <ul><li>Access to eligible premium content</li><li>Ad-free viewing where supported</li></ul><br><button class="btn" disabled style="width:100%;justify-content:center">Subscribe (coming soon)</button></div>
+ <div class="plan"><b>Free</b><div class="price">₦0</div><ul><li>Create an account</li><li>Browse the catalogue</li><li>Watch content available on the free plan</li><li>Ads where supported</li></ul></div></div>
+ <h2>Manage subscription</h2><div class="note">${p?'Subscription management will appear here once payments are connected.':'No active subscription.'}</div>
+ <div class="note">Prices are proposed. Payments are not connected yet, and Premium will unlock only after a payment is verified on our server.</div>`}
+function render(){if(S.loading){$.innerHTML=`<div class="splash">${logo}</div>`;return}
+ if(sb&&(!S.user||S.recovery)){$.innerHTML=gateV();return}
+ const v=S.view;let h,after;
  if(v&&v.k=='play')h=playerV();else if(v&&v.k=='detail')h=detailV();
- else{h=`<header>${logo}<div style="display:flex;gap:8px"><button class="ic" aria-label="Search" onclick="go('search')">${ic(I.search)}</button><button class="ic" aria-label="Profile" onclick="go('profile')">${ic(I.profile)}</button></div></header>`+({home:homeV,search:searchV,favs:favsV,profile:profileV}[S.tab])();after=S.tab}
- $.innerHTML=h+`<footer>This product uses the TMDB API but is not endorsed or certified by TMDB.</footer><nav>${[['home','Home'],['search','Search'],['favs','Favorites'],['profile','Profile']].map(([k,l])=>`<button class="${S.tab==k&&!v?'on':''}" onclick="go('${k}')">${ic(I[k])}${l}</button>`).join('')}</nav>`;
+ else{h=`<header>${logo}<div style="display:flex;gap:8px"><button class="ic" aria-label="Search" onclick="go('search')">${ic(I.search)}</button><button class="ic" aria-label="Profile" onclick="go('profile')">${ic(I.profile)}</button></div></header>`+({home:homeV,search:searchV,favs:favsV,premium:premiumV,profile:profileV}[S.tab])();after=S.tab}
+ $.innerHTML=h+`<footer>This product uses the TMDB API but is not endorsed or certified by TMDB.</footer><nav>${[['home','Home'],['search','Search'],['favs','Favorites'],['premium','Premium'],['profile','Profile']].map(([k,l])=>`<button class="${S.tab==k&&!v?'on':''}" onclick="go('${k}')">${ic(I[k])}${l}</button>`).join('')}</nav>`;
  if(after=='home')loadHome();if(after=='search')doSearch()}
 render();loadUser();
 </script></body></html>
