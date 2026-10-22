@@ -121,6 +121,7 @@ function profileV(){if(!sb)return'<h2>Profile</h2><p class="err">Accounts could 
  <div class="mlist">${mrow(I.profile,'Profile','Name, age and email',"sub('details')")}${mrow(I.premium,'Premium',pm?'Active':'See plans and prices',"go('premium')")}${mrow(I.favs,'Favorites',S.favs.length+' saved',"go('favs')")}${mrow(I.clock,'Watch History',hs.length?hs.length+' recent':'Nothing yet',"sub('history')")}${mrow(I.lock,'Security','Change password',"sub('security')")}${mrow(I.info,'About','IndraPlay and credits',"sub('about')")}</div>
  ${hs.length?`<h2>Recently watched</h2><div class="row">${hs.map(hcard).join('')}</div>`:''}
  <div class="pad" style="margin-top:24px"><button class="btn alt" onclick="sb.auth.signOut()" style="width:100%;justify-content:center;color:#f87171">Log out</button></div>`}
+async function googleIn(){try{const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin}});if(error)msg('Google sign-in failed: '+error.message)}catch(e){msg('Google sign-in failed. Please try again.')}}
 async function doAuth(){const em=$v('em').trim(),pw=$v('pw'),m=S.authMode;
  if(!/^\S+@\S+\.\S+$/.test(em))return msg('Enter a valid email address.');
  if(m!='forgot'&&pw.length<8)return msg('Password must be at least 8 characters.');
@@ -205,7 +206,7 @@ function gateV(){const m=S.gate;
  <input class="search" id="em" type="email" placeholder="Email" autocomplete="email">
  ${m!='forgot'?`<input class="search" id="pw" type="password" placeholder="Password (min 8 characters)" autocomplete="${m=='signup'?'new-password':'current-password'}">`:''}
  <button class="btn" id="go" onclick="doAuth()" style="justify-content:center">${m=='signup'?'Sign up':m=='forgot'?'Send reset link':'Log in'}</button>
- ${m=='login'?'<button class="btn alt" disabled style="justify-content:center">Google sign-in (not set up yet)</button>':''}
+ ${m!='forgot'?'<div class="muted" style="text-align:center;font-size:12px">or</div><button class="btn alt" onclick="googleIn()" style="justify-content:center">Continue with Google</button>':''}
  <div class="muted" style="text-align:center;line-height:2">${m!='login'?'<a href="#" onclick="setMode(\'login\');return false" style="color:var(--v)">Log in</a> · ':''}${m!='signup'?'<a href="#" onclick="setMode(\'signup\');return false" style="color:var(--v)">Create account</a> · ':''}${m!='forgot'?'<a href="#" onclick="setMode(\'forgot\');return false" style="color:var(--v)">Forgot password?</a>':''}</div></div>`)}
 function premiumV(){const y=S.bill=='year',p=S.plan=='premium';
  return`<h2>Premium</h2><div class="note"><b style="color:#fff">Your plan: ${p?'Premium':'Free'}</b><br>${p?'Thank you for subscribing.':'You are not subscribed to Premium.'}</div>
