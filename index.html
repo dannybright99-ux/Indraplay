@@ -177,15 +177,15 @@ function initPlayer(){vid=document.getElementById('v');const sp=document.getElem
  document.getElementById('fs').onclick=()=>{const p=vid.parentElement;if(p.requestFullscreen)p.requestFullscreen();else if(p.webkitRequestFullscreen)p.webkitRequestFullscreen();else if(vid.webkitEnterFullscreen)vid.webkitEnterFullscreen()};
  document.getElementById('ql').onclick=()=>{const q=document.getElementById('qm'),L=S.srcs||[];q.style.display=q.style.display=='none'?'block':'none';
   q.innerHTML=L.length<2?'Only one quality is available for this video.':L.map((o,i)=>`<button class="btn alt" style="margin:4px 6px 0 0;min-height:40px" onclick="pickQ(${i})">${esc(o.quality)}</button>`).join('')};
- if(S.view.key=='test')makeTest(sp);else loadSrc(sp)}
+ loadSrc(sp)}
 function pickQ(i){const o=(S.srcs||[])[i];if(!o||!o.url||!vid)return;const t=vid.currentTime,pl=!vid.paused;vid.src=o.url;vid.onloadedmetadata=()=>{vid.currentTime=t;if(pl)vid.play()};document.getElementById('ql').textContent=o.quality+' ▾';document.getElementById('qm').style.display='none'}
 async function loadSrc(sp){const v=vid,k=S.view.key;
  try{const{data,error}=await sb.from('video_sources').select('quality,url,access,license,credit,sort_order').eq('media_key',k).order('sort_order');
- if(error)throw error;if(!data||!data.length){sp.textContent='No video is available for your account.';return}
+ if(error)throw error;if(!data||!data.length){if(k=='test')return makeTest(sp);sp.textContent='No video is available for your account.';return}
  if(vid!==v)return;S.srcs=data;const d=data.find(x=>x.quality=='720p')||data[0];
  document.getElementById('ql').textContent=d.quality+' ▾';v.src=d.url;
  const c=data[0],cr=document.getElementById('cr');if(cr)cr.textContent=[c.credit,c.license].filter(Boolean).join(' · ')}
- catch(e){sp.style.display='grid';sp.textContent='Could not load the video. '+(e.message||'')}}
+ catch(e){if(k=='test')return makeTest(sp);sp.style.display='grid';sp.textContent='Could not load the video. '+(e.message||'')}}
 async function makeTest(sp){const v=vid;try{if(genUrl){v.src=genUrl;return}if(!window.MediaRecorder)throw 0;sp.textContent='Generating test video (8 seconds)…';
  const c=document.createElement('canvas');c.width=640;c.height=360;const x=c.getContext('2d');const mt=['video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
  const rec=new MediaRecorder(c.captureStream(30),mt?{mimeType:mt}:{});const ch=[];rec.ondataavailable=e=>ch.push(e.data);const t0=performance.now();let raf;
