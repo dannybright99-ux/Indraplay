@@ -133,22 +133,22 @@ async function doAuth(){const em=$v('em').trim(),pw=$v('pw'),m=S.authMode;
 async function newPw(){const p=$v('np'),c=document.getElementById('np2');if(p.length<8)return msg('Password must be at least 8 characters.');if(c&&c.value!==p)return msg('The two passwords do not match.');
  const{error}=await sb.auth.updateUser({password:p});if(error)return msg(friendly(error.message));
  if(S.recovery){S.tab='home';S.view=null}S.recovery=false;msg('Password updated.');render()}
-async function loadData(){const[f,h,p,pr]=await Promise.all([sb.from('favorites').select('*').order('created_at',{ascending:false}),sb.from('watch_history').select('*').order('updated_at',{ascending:false}).limit(20),sb.from('subscriptions').select('plan,status').maybeSingle(),sb.from('profiles').select('display_name,age').maybeSingle()]);
+async function loadData(){const[f,h,p,pr,av]=await Promise.all([sb.from('favorites').select('*').order('created_at',{ascending:false}),sb.from('watch_history').select('*').order('updated_at',{ascending:false}).limit(20),sb.from('subscriptions').select('plan,status').maybeSingle(),sb.from('profiles').select('display_name,age').maybeSingle(),sb.rpc('video_availability')]);
  S.favs=(f.data||[]).map(r=>({key:r.media_key,type:r.media_type,id:r.tmdb_id,title:r.title,poster:r.poster_path,backdrop:r.backdrop_path,year:r.year,rating:r.rating,overview:r.overview}));
- S.hist=h.data||[];S.hist.forEach(regH);S.prof=pr.data||null;S.plan=p.data&&p.data.status=='active'?p.data.plan:'free'}
+ S.hist=h.data||[];S.hist.forEach(regH);S.prof=pr.data||null;S.avail={};((av&&av.data)||[]).forEach(x=>S.avail[x.media_key]=x.access);S.plan=p.data&&p.data.status=='active'?p.data.plan:'free'}
 async function setUser(u){const was=S.user;if(u&&!was){S.tab='home';S.view=null}if(!u){S.tab='home';S.view=null;S.sub=null;S.gate='welcome'}S.user=u;if(u){try{await loadData()}catch(e){}}else{S.favs=[];S.hist=[];S.plan='free'}S.loading=false;render()}
 async function loadUser(){if(!sb){S.loading=false;return render()}const{data}=await sb.auth.getSession();await setUser(data.session?data.session.user:null);
  sb.auth.onAuthStateChange((ev,ses)=>{if(ev=='PASSWORD_RECOVERY'){S.recovery=true;S.tab='profile';S.view=null;render()}
   const u=ses?ses.user:null;if((u&&u.id)!==(S.user&&S.user.id))setTimeout(()=>setUser(u),0)})}
-async function logWatch(){if(!sb||!S.user)return;await sb.from('watch_history').upsert({user_id:S.user.id,media_key:'test',title:TEST.title,poster_path:null,media_type:'test',tmdb_id:0,progress_seconds:0,updated_at:new Date().toISOString()},{onConflict:'user_id,media_key'});
+async function logWatch(k){if(!sb||!S.user)return;const m=reg[k]||TEST;await sb.from('watch_history').upsert({user_id:S.user.id,media_key:m.key,title:m.title,poster_path:m.poster||null,media_type:m.type,tmdb_id:m.id,progress_seconds:0,updated_at:new Date().toISOString()},{onConflict:'user_id,media_key'});
  const{data}=await sb.from('watch_history').select('*').order('updated_at',{ascending:false}).limit(20);S.hist=data||[];S.hist.forEach(regH)}
 function detailV(){const m=reg[S.view.key];if(!m)return'<p class="err">Title not found.</p>';const f=S.favs.some(x=>x.key==m.key);const bg=m.backdrop?`linear-gradient(to top,#09090D 5%,#09090D44 80%),url(${IMG}w780${m.backdrop})`:'linear-gradient(160deg,#4c1d95,#09090D)';
  return`<button class="back btn alt" onclick="S.view=null;render()">← Back</button><div class="hero" style="background-image:${bg};min-height:240px;margin-top:6px"><h1>${esc(m.title)}</h1></div>
  <div class="pad" style="margin-top:14px"><div id="meta"><span class="chip">${m.year||''}</span>${m.rating?`<span class="chip">★ ${m.rating.toFixed(1)}</span>`:''}</div>
  <p class="muted" style="margin:6px 0 16px">${esc(m.overview)||'No synopsis available.'}</p>
- <div style="display:flex;gap:10px;flex-wrap:wrap">${m.key=='test'?'<button class="btn" onclick="play()">▶ Watch Now</button>':'<button class="btn" disabled>Not available to stream</button>'}
+ <div style="display:flex;gap:10px;flex-wrap:wrap">${watchBtn(m)}
  <button class="btn alt" onclick="fav('${m.key}')">${f?'♥ In Favorites':'♡ Add to Favorites'}</button></div>
- ${m.key=='test'?'':'<p class="muted" style="margin-top:10px">No authorized video source is attached to this title.</p>'}</div><div id="sim"></div>`}
+ ${m.key=='test'||S.avail[m.key]?'':'<p class="muted" style="margin-top:10px">No authorized video source is attached to this title.</p>'}</div><div id="sim"></div>`}
 async function loadDetail(k){const m=reg[k];try{const[d,s]=await Promise.all([api(m.type+'/'+m.id),api(m.type+'/'+m.id+'/similar').catch(()=>({results:[]}))]);if(!S.view||S.view.key!=k)return;
  const rt=d.runtime||(d.episode_run_time||[])[0],meta=document.getElementById('meta');
  if(meta)meta.innerHTML+=(d.genres||[]).map(g=>`<span class="chip">${esc(g.name)}</span>`).join('')+(rt?`<span class="chip">${rt} min</span>`:'')+(m.type=='tv'&&d.number_of_seasons?`<span class="chip">${d.number_of_seasons} season(s)</span>`:'');
@@ -156,12 +156,16 @@ async function loadDetail(k){const m=reg[k];try{const[d,s]=await Promise.all([ap
  catch(e){const el=document.getElementById('sim');if(el)el.innerHTML=`<p class="err">Could not load more details: ${esc(e.message)}</p>`}}
 /* ---- player (test reel generated in-browser) ---- */
 let vid,genUrl;const fmt=t=>isFinite(t)?Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0'):'0:00';
-function play(){S.view={k:'play'};render();scrollTo(0,0);initPlayer();logWatch()}
-function playerV(){return`<button class="back btn alt" onclick="stopP();S.view={k:'detail',key:'test'};render()">← Details</button>
+function watchBtn(m){const a=m.key=='test'?'free':S.avail[m.key];
+ if(!a)return'<button class="btn" disabled>Not available to stream</button>';
+ if(a=='premium'&&S.plan!='premium')return`<button class="btn" onclick="go('premium')">🔒 Premium only</button>`;
+ return`<button class="btn" onclick="play('${m.key}')">▶ Watch Now</button>`}
+function play(k){k=k||'test';S.view={k:'play',key:k};S.srcs=[{quality:'Original',url:null}];render();scrollTo(0,0);initPlayer();logWatch(k)}
+function playerV(){return`<button class="back btn alt" onclick="stopP();S.view={k:'detail',key:S.view.key};render()">← Details</button>
 <div class="player" style="margin-top:6px"><video id="v" playsinline preload="metadata"></video><div class="spin" id="sp">Loading video…</div></div>
 <div class="ctl"><button id="pp" aria-label="Play or pause">▶</button><input type="range" id="sk" min="0" max="1000" value="0" aria-label="Progress"><span id="tm" class="muted" style="font-size:12px;min-width:76px;text-align:right">0:00</span></div>
 <div class="ctl" style="padding-top:0"><span class="muted" style="font-size:12px">Vol</span><input type="range" id="vo" min="0" max="1" step="0.05" value="1" aria-label="Volume"><button id="ql" aria-label="Video quality" style="width:auto;padding:0 10px;font-size:13px">Original ▾</button><button id="fs" aria-label="Fullscreen">⛶</button></div><div id="qm" class="note" style="display:none;margin-top:0"></div>
-<p class="muted pad" style="margin-top:14px">Test clip generated in your browser. Real authorized video URLs will come from the server.</p>`}
+<p class="muted pad" id="cr" style="margin-top:14px">${S.view.key=='test'?'Test clip generated in your browser.':''}</p>`}
 function stopP(){if(vid){vid.pause();vid.removeAttribute('src');vid.load()}vid=null}
 function initPlayer(){vid=document.getElementById('v');const sp=document.getElementById('sp'),pp=document.getElementById('pp'),sk=document.getElementById('sk'),tm=document.getElementById('tm');
  vid.onwaiting=()=>{sp.style.display='grid';sp.textContent='Buffering…'};vid.oncanplay=vid.onplaying=()=>sp.style.display='none';
@@ -171,11 +175,17 @@ function initPlayer(){vid=document.getElementById('v');const sp=document.getElem
  pp.onclick=()=>vid.paused?vid.play():vid.pause();sk.oninput=()=>{if(isFinite(vid.duration))vid.currentTime=sk.value/1000*vid.duration};
  document.getElementById('vo').oninput=e=>vid.volume=e.target.value;
  document.getElementById('fs').onclick=()=>{const p=vid.parentElement;if(p.requestFullscreen)p.requestFullscreen();else if(p.webkitRequestFullscreen)p.webkitRequestFullscreen();else if(vid.webkitEnterFullscreen)vid.webkitEnterFullscreen()};
- document.getElementById('ql').onclick=()=>{const q=document.getElementById('qm'),L=SOURCES.test;q.style.display=q.style.display=='none'?'block':'none';
-  q.innerHTML=L.length<2?'Only one quality is available for this video. Choices like 480p, 720p and 1080p appear when a title has a separate video file for each.':L.map((o,i)=>`<button class="btn alt" style="margin:4px 6px 0 0;min-height:40px" onclick="pickQ(${i})">${o.label}</button>`).join('')};
- makeTest(sp)}
-const SOURCES={test:[{label:'Original',url:null}]};
-function pickQ(i){const o=SOURCES.test[i];if(!o||!o.url||!vid)return;const t=vid.currentTime,pl=!vid.paused;vid.src=o.url;vid.onloadedmetadata=()=>{vid.currentTime=t;if(pl)vid.play()};document.getElementById('ql').textContent=o.label+' ▾';document.getElementById('qm').style.display='none'}
+ document.getElementById('ql').onclick=()=>{const q=document.getElementById('qm'),L=S.srcs||[];q.style.display=q.style.display=='none'?'block':'none';
+  q.innerHTML=L.length<2?'Only one quality is available for this video.':L.map((o,i)=>`<button class="btn alt" style="margin:4px 6px 0 0;min-height:40px" onclick="pickQ(${i})">${esc(o.quality)}</button>`).join('')};
+ if(S.view.key=='test')makeTest(sp);else loadSrc(sp)}
+function pickQ(i){const o=(S.srcs||[])[i];if(!o||!o.url||!vid)return;const t=vid.currentTime,pl=!vid.paused;vid.src=o.url;vid.onloadedmetadata=()=>{vid.currentTime=t;if(pl)vid.play()};document.getElementById('ql').textContent=o.quality+' ▾';document.getElementById('qm').style.display='none'}
+async function loadSrc(sp){const v=vid,k=S.view.key;
+ try{const{data,error}=await sb.from('video_sources').select('quality,url,access,license,credit,sort_order').eq('media_key',k).order('sort_order');
+ if(error)throw error;if(!data||!data.length){sp.textContent='No video is available for your account.';return}
+ if(vid!==v)return;S.srcs=data;const d=data.find(x=>x.quality=='720p')||data[0];
+ document.getElementById('ql').textContent=d.quality+' ▾';v.src=d.url;
+ const c=data[0],cr=document.getElementById('cr');if(cr)cr.textContent=[c.credit,c.license].filter(Boolean).join(' · ')}
+ catch(e){sp.style.display='grid';sp.textContent='Could not load the video. '+(e.message||'')}}
 async function makeTest(sp){const v=vid;try{if(genUrl){v.src=genUrl;return}if(!window.MediaRecorder)throw 0;sp.textContent='Generating test video (8 seconds)…';
  const c=document.createElement('canvas');c.width=640;c.height=360;const x=c.getContext('2d');const mt=['video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
  const rec=new MediaRecorder(c.captureStream(30),mt?{mimeType:mt}:{});const ch=[];rec.ondataavailable=e=>ch.push(e.data);const t0=performance.now();let raf;
